@@ -22,8 +22,8 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: anthropic SDK インストール
-        run: pip install anthropic
+      - name: 依存ライブラリのインストール
+        run: pip install anthropic httpx
 
       - name: 週次コンテンツ生成
         id: generate
@@ -32,6 +32,14 @@ jobs:
         run: |
           python scripts/generate_weekly_content.py
           echo "week=$(cat .week_number)" >> "$GITHUB_OUTPUT"
+
+      - name: Google ドライブへアップロード
+        env:
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
+        run: python scripts/upload_to_drive.py
 
       - name: コミット & プッシュ
         run: |
