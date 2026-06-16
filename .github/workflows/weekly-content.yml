@@ -23,7 +23,7 @@ jobs:
           python-version: '3.12'
 
       - name: 依存ライブラリのインストール
-        run: pip install anthropic httpx
+        run: pip install anthropic
 
       - name: 週次コンテンツ生成
         id: generate
@@ -45,10 +45,3 @@ jobs:
             git push
           fi
 
-      - name: Google ドライブへアップロード
-        env:
-          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
-          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
-          GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
-        run: python scripts/upload_to_drive.py

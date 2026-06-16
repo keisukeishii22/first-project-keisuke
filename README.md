@@ -9,7 +9,15 @@
 - `自動運用ルーティーン.md` — 指示がなくても週次で動く手順と起動方法
 - `進捗メモ.md` — 生成ログと KPI 記録欄
 - `生成物/第N週/` — 各週の生成物(note記事・リール台本・カルーセル構成・ストーリーズ告知)
+- `.github/workflows/weekly-content.yml` — 毎週日曜にコンテンツを自動生成する GitHub Actions
+- `Googleドライブ同期.gs` — 生成物を Google ドライブへ自動コピーする Apps Script
 - `.claude/` — SessionStart フック(ルーティーン自動認識)
+
+## 自動化の全体像
+
+1. **生成**:GitHub Actions が毎週日曜に次の週のコンテンツを生成し `生成物/第N週/` に保存
+2. **ドライブ保存**:Google Apps Script(`Googleドライブ同期.gs`)が GitHub の生成物を
+   Google ドライブ「石善建設_note×Instagram運用」へ Google ドキュメントとしてコピー
 
 ## 毎週の使い方
 
