@@ -3,9 +3,10 @@
  * GitHub の「生成物/第N週/」を Google ドライブに自動コピーする Apps Script。
  *
  * 仕組み:
- *   公開リポジトリ keisukeishii22/first-project-keisuke の「生成物」フォルダを
- *   GitHub の公開API経由で読み取り、各週の Markdown を Google ドキュメントとして
+ *   公開リポジトリ keisukeishii22/first-project-keisuke の各週の Markdown を
+ *   raw.githubusercontent.com から直接読み取り、Google ドキュメントとして
  *   ドライブの保存先フォルダに作成する(すでに作成済みのものはスキップ)。
+ *   GitHub API は使わない(Apps Script の共有IPでは回数制限403に当たりやすいため)。
  *   ID・シークレット・トークンは不要(Apps Script が本人として動くため)。
  *
  * 使い方:
@@ -22,6 +23,8 @@ var GITHUB_REPO = 'first-project-keisuke';
 var GITHUB_BRANCH = 'main';
 var CONTENT_ROOT = '生成物';                       // リポジトリ内の親フォルダ名
 var DRIVE_PARENT_ID = '1LWfpH_93k6aaeQvRukRUvUdkoWaV4-0q'; // 「石善建設_note×Instagram運用」フォルダID
+var FILE_STEMS = ['note記事', 'リール台本', 'カルーセル構成', 'ストーリーズ告知']; // 各週の固定ファイル名
+var MAX_WEEKS = 16;                                // 1週目から何週目まで探すか(12週+予備)
 
 /**
  * 初回セットアップ:週次トリガーを登録し、すぐに1回同期する。
@@ -51,46 +54,45 @@ function setup() {
  */
 function syncToDrive() {
   var parent = DriveApp.getFolderById(DRIVE_PARENT_ID);
-  var weeks = listGitHubDir(CONTENT_ROOT); // 生成物 直下(第1週, 第2週, ...)
   var created = 0;
+  var emptyStreak = 0; // 連続で1ファイルも無かった週数
 
-  weeks.forEach(function (week) {
-    if (week.type !== 'dir') return;
-    var weekName = week.name;                 // 例:第3週
-    var weekFolder = getOrCreateFolder(parent, weekName);
+  for (var n = 1; n <= MAX_WEEKS; n++) {
+    var weekName = '第' + n + '週';
+    var weekFolder = null;
+    var foundThisWeek = 0;
 
-    var files = listGitHubDir(CONTENT_ROOT + '/' + weekName);
-    files.forEach(function (f) {
-      if (f.type !== 'file' || !/\.md$/.test(f.name)) return;
-      var docName = weekName + '_' + f.name.replace(/\.md$/, ''); // 例:第3週_note記事
-      if (weekFolder.getFilesByName(docName).hasNext()) return;   // 既存はスキップ
+    FILE_STEMS.forEach(function (stem) {
+      var text = fetchRaw(CONTENT_ROOT + '/' + weekName + '/' + stem + '.md');
+      if (text === null) return;            // その週にそのファイルが無い
+      foundThisWeek++;
 
-      var text = UrlFetchApp.fetch(f.download_url).getContentText();
+      if (!weekFolder) weekFolder = getOrCreateFolder(parent, weekName);
+      var docName = weekName + '_' + stem;  // 例:第3週_note記事
+      if (weekFolder.getFilesByName(docName).hasNext()) return; // 既存はスキップ
+
       createGoogleDoc(weekFolder, docName, text);
       created++;
       Logger.log('作成: ' + weekName + '/' + docName);
     });
-  });
+
+    // 何週か連続で空なら、それ以降は未生成とみなして打ち切る
+    emptyStreak = foundThisWeek === 0 ? emptyStreak + 1 : 0;
+    if (emptyStreak >= 2) break;
+  }
 
   Logger.log('同期完了。新規作成 ' + created + ' 件。');
 }
 
 // ===== 補助関数 =====
 
-/** GitHub 公開APIで指定パスの中身一覧を取得する。 */
-function listGitHubDir(path) {
+/** raw.githubusercontent.com からファイル本文を取得する。無ければ null。 */
+function fetchRaw(path) {
   var encoded = path.split('/').map(encodeURIComponent).join('/');
-  var url = 'https://api.github.com/repos/' + GITHUB_OWNER + '/' + GITHUB_REPO +
-    '/contents/' + encoded + '?ref=' + GITHUB_BRANCH;
-  var res = UrlFetchApp.fetch(url, {
-    headers: { 'User-Agent': 'gas-ishizen', 'Accept': 'application/vnd.github+json' },
-    muteHttpExceptions: true,
-  });
-  if (res.getResponseCode() !== 200) {
-    Logger.log('GitHub取得に失敗 (' + res.getResponseCode() + '): ' + path);
-    return [];
-  }
-  return JSON.parse(res.getContentText());
+  var url = 'https://raw.githubusercontent.com/' + GITHUB_OWNER + '/' +
+    GITHUB_REPO + '/' + GITHUB_BRANCH + '/' + encoded;
+  var res = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+  return res.getResponseCode() === 200 ? res.getContentText() : null;
 }
 
 /** 親フォルダ直下の同名フォルダを取得、無ければ作成する。 */
