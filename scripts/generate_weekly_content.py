@@ -38,9 +38,21 @@ def extract_common_rules(theme_map: str) -> str:
     return m.group(1).strip() if m else ""
 
 
-def generate_pack(client: anthropic.Anthropic, week_num: int, week_theme: str, common_rules: str) -> dict:
-    """Claude API を呼び出してテーマパック4点を生成し、セクション辞書で返す。"""
-    prompt = f"""あなたは石善建設(南房総の工務店・3代目 圭佑)の note×Instagram 連動コンテンツ担当です。
+# 生成する4つの成果物の定義(キー, タイトル, 個別指示)
+DELIVERABLES = [
+    ("note", "note記事下書き",
+     "note記事下書きを作成してください。構成:タイトル案3本・リード文(400字以内)・本文構成(見出し付き)・CTA・共通ルール適合チェックリスト。"),
+    ("reel", "リール台本2本",
+     "リール台本を2本作成してください。各30〜45秒。フック→本編→CTA の構成。撮影場所の注記(事務所・倉庫・車内のみ)を添えること。"),
+    ("carousel", "カルーセル構成案",
+     "カルーセル構成案を作成してください。表紙+5枚+CTA の計7枚分。各ページの見出しと要点を箇条書きで。個人アカウント用。"),
+    ("stories", "ストーリーズ告知文",
+     "ストーリーズ告知文を作成してください。3〜4枚の連投。ティザー・本投稿告知・エンゲージ用(質問/アンケート)・フォロー誘導 の流れ。"),
+]
+
+
+def _build_prompt(week_num: int, week_theme: str, common_rules: str, instruction: str) -> str:
+    return f"""あなたは石善建設(南房総の工務店・3代目 圭佑)の note×Instagram 連動コンテンツ担当です。
 
 ## 共通ルール(すべての生成物に適用)
 {common_rules}
@@ -54,42 +66,28 @@ def generate_pack(client: anthropic.Anthropic, week_num: int, week_theme: str, c
 補助金・法令・税制・許可制度に数値や要件を書く場合は「公開前に一次情報で確認」と注記してください。
 固有名詞(取引先・チェーン名・契約詳細)は伏せ、一般論＋体験談の形にしてください。
 
-以下の区切り記号を必ず使い、4つのセクションを順番に出力してください:
+## 今回の成果物
+{instruction}
 
-===NOTE_START===
-(note記事下書き: タイトル案3本・リード文・本文構成・CTA・共通ルール適合チェックリスト)
-===NOTE_END===
+成果物の本文のみを Markdown で出力してください(前置き・後書き・コードフェンスは不要)。"""
 
-===REEL_START===
-(リール台本2本: 各30〜45秒。フック→本編→CTA。撮影場所の注記あり)
-===REEL_END===
 
-===CAROUSEL_START===
-(カルーセル構成案: 表紙+5枚+CTA)
-===CAROUSEL_END===
+def generate_pack(client: anthropic.Anthropic, week_num: int, week_theme: str, common_rules: str) -> dict:
+    """成果物ごとに個別の API 呼び出しを行い、セクション辞書で返す。
 
-===STORIES_START===
-(ストーリーズ告知文: 3〜4枚の連投。ティザー・本投稿告知・エンゲージ用・フォロー誘導)
-===STORIES_END===
-"""
-
-    msg = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=4096,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    text = msg.content[0].text
-
-    def extract(start_tag: str, end_tag: str) -> str:
-        m = re.search(rf'{re.escape(start_tag)}(.+?){re.escape(end_tag)}', text, re.DOTALL)
-        return m.group(1).strip() if m else text
-
-    return {
-        "note":     extract("===NOTE_START===",     "===NOTE_END==="),
-        "reel":     extract("===REEL_START===",     "===REEL_END==="),
-        "carousel": extract("===CAROUSEL_START===", "===CAROUSEL_END==="),
-        "stories":  extract("===STORIES_START===",  "===STORIES_END==="),
-    }
+    1回にまとめるとトークン上限で末尾が切れるため、4回に分けて確実に生成する。
+    """
+    pack = {}
+    for key, title, instruction in DELIVERABLES:
+        print(f"  - {title} を生成中...")
+        prompt = _build_prompt(week_num, week_theme, common_rules, instruction)
+        msg = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=4096,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        pack[key] = msg.content[0].text.strip()
+    return pack
 
 
 def write_files(week_num: int, pack: dict, today: str) -> None:
