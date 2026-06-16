@@ -33,19 +33,10 @@ jobs:
           python scripts/generate_weekly_content.py
           echo "week=$(cat .week_number)" >> "$GITHUB_OUTPUT"
 
-      - name: Google ドライブへアップロード
-        env:
-          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
-          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
-          GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
-        run: python scripts/upload_to_drive.py
-
       - name: コミット & プッシュ
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          rm -f .week_number
           git add -A
           if git diff --cached --quiet; then
             echo "変更なし(全週生成済み or スキップ)"
@@ -53,3 +44,11 @@ jobs:
             git commit -m "週次コンテンツ自動生成: 第${{ steps.generate.outputs.week }}週 ($(date +%Y-%m-%d))"
             git push
           fi
+
+      - name: Google ドライブへアップロード
+        env:
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
+        run: python scripts/upload_to_drive.py
