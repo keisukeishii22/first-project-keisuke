@@ -40,7 +40,27 @@ def get_access_token(client_id: str, client_secret: str, refresh_token: str) -> 
         },
         timeout=30,
     )
-    resp.raise_for_status()
+    if resp.status_code != 200:
+        # Google はエラー理由を JSON で返す(invalid_client / invalid_grant 等)。
+        # 原因切り分けのため、その内容を表示する。
+        detail = resp.text
+        try:
+            j = resp.json()
+            detail = f"{j.get('error')} / {j.get('error_description')}"
+        except Exception:
+            pass
+        print(f"❌ Google 認証に失敗しました (HTTP {resp.status_code}): {detail}", file=sys.stderr)
+        if resp.status_code in (400, 401):
+            print(
+                "  → よくある原因:\n"
+                "     (a) リフレッシュトークンが、登録したクライアントID/シークレットと別物\n"
+                "         (OAuth Playgroundで歯車→『Use your own OAuth credentials』を\n"
+                "          チェックせずに取得した場合に起きます)\n"
+                "     (b) クライアントID/シークレットの値に余分な空白・改行が入っている\n"
+                "     (c) リフレッシュトークンの有効期限切れ(テスト公開アプリは約7日で失効)",
+                file=sys.stderr,
+            )
+        resp.raise_for_status()
     return resp.json()["access_token"]
 
 
