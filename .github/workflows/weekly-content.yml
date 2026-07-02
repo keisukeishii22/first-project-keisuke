@@ -1,9 +1,11 @@
 name: 週次コンテンツ自動生成
 
+# 定期実行(cron)は 2026-07-02 に停止。
+# 週次生成は Web 検索でファクトチェックできる Claude Code スケジュールセッションに移行
+# (設定手順: 自動運用ルーティーン.md「起動方法」)。
+# このワークフローは緊急時の手動フォールバックとして残す(Web検索なし・参考情報源は発行元列挙のみ)。
 on:
-  schedule:
-    - cron: '0 0 * * 0'  # 毎週日曜 09:00 JST (UTC 00:00)
-  workflow_dispatch:       # 手動実行ボタンも用意
+  workflow_dispatch:       # 手動実行のみ
 
 permissions:
   contents: write
