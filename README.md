@@ -7,15 +7,20 @@
 - `CLAUDE.md` — 運用ルール(Claude Code が常に参照)
 - `12週テーママップ.md` — 12週分のテーマ×4展開(note/リール/カルーセル/ストーリーズ)
 - `自動運用ルーティーン.md` — 指示がなくても週次で動く手順と起動方法
+- `情報源ガイドライン.md` — 情報源の3層ルール・引用形式・公開前ファクトチェック手順
 - `進捗メモ.md` — 生成ログと KPI 記録欄
 - `生成物/第N週/` — 各週の生成物(note記事・リール台本・カルーセル構成・ストーリーズ告知)
-- `.github/workflows/weekly-content.yml` — 毎週日曜にコンテンツを自動生成する GitHub Actions
+- `媒体別運用/` — 石善建設公式インスタ・圭佑不動産インスタ・HP ブログの媒体別ガードレール
+- `.github/workflows/weekly-content.yml` — コンテンツ生成の GitHub Actions(手動フォールバック専用)
 - `Googleドライブ同期.gs` — 生成物を Google ドライブへ自動コピーする Apps Script
 - `.claude/` — SessionStart フック(ルーティーン自動認識)
 
 ## 自動化の全体像
 
-1. **生成**:GitHub Actions が毎週日曜に次の週のコンテンツを生成し `生成物/第N週/` に保存
+1. **生成**:Claude Code のスケジュールセッションが毎週日曜に次の週のコンテンツを生成し
+   `生成物/第N週/` に保存(Web 検索で一次情報を裏取りしたうえで生成。
+   トリガーの設定手順は `自動運用ルーティーン.md`「起動方法」を参照。
+   GitHub Actions は手動実行のみのフォールバック)
 2. **ドライブ保存**:Google Apps Script(`Googleドライブ同期.gs`)が GitHub の生成物を
    Google ドライブ「石善建設_note×Instagram運用」へ Google ドキュメントとしてコピー
 
