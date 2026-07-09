@@ -38,10 +38,24 @@ def extract_common_rules(theme_map: str) -> str:
     return m.group(1).strip() if m else ""
 
 
-# 生成する4つの成果物の定義(キー, タイトル, 個別指示)
+# 生成する4つの成果物の定義(キー, タイトル, 個別指示, 最大トークン数)
+# note は石善建設HP用ブログとして本文6000〜8000字の長文を書くため、max_tokens を大きく取る。
+# (16000 は非ストリーミングでも SDK のHTTPタイムアウトに収まる上限の目安)
 DELIVERABLES = [
     ("note", "note記事下書き",
-     "note記事下書きを作成してください。構成:タイトル案3本・リード文(400字以内)・本文構成(見出し付き)・CTA・共通ルール適合チェックリスト。"),
+     "石善建設の公式サイト(HP)ブログに載せる読み物記事として、note記事の本文を作成してください。\n"
+     "【文量】本文は6000〜8000文字。骨子や箇条書きだけで終わらせず、最後まで書き切った完成本文にすること。\n"
+     "【体裁】HPブログらしい丁寧で読みやすい構成にする:\n"
+     "  1. タイトル案3本(SEOを意識し、検索されやすい語を自然に含める)\n"
+     "  2. リード文(300〜400字。読者の悩みに共感し、この記事で分かることを提示)\n"
+     "  3. 目次(見出しの一覧)\n"
+     "  4. 本文(## と ### の見出しで章立て。導入→本論→まとめの流れ。段落は3〜5文で改行し、"
+     "必要に応じて箇条書き・比較表・チェックリストを使って読みやすくする)\n"
+     "  5. まとめ(要点の再整理)\n"
+     "  6. CTA(南房総エリアの相談・お問い合わせへ誘導)\n"
+     "【トーン】1946年創業の工務店3代目・現場を知る専門家が、これから家を建てる/直す初心者に"
+     "『損しない順番と判断』を正直に解説する語り口。煽らず、静かな説得力で。\n"
+     "【固有名詞】取引先・チェーン名・契約詳細は伏せ、一般論＋体験談の形にする。"),
     ("reel", "リール台本2本",
      "リール台本を2本作成してください。各30〜45秒。フック→本編→CTA の構成。撮影場所の注記(事務所・倉庫・車内のみ)を添えること。"),
     ("carousel", "カルーセル構成案",
@@ -49,6 +63,14 @@ DELIVERABLES = [
     ("stories", "ストーリーズ告知文",
      "ストーリーズ告知文を作成してください。3〜4枚の連投。ティザー・本投稿告知・エンゲージ用(質問/アンケート)・フォロー誘導 の流れ。"),
 ]
+
+# 成果物ごとの最大出力トークン数(note は長文HPブログのため大きめ)
+MAX_TOKENS = {
+    "note": 16000,
+    "reel": 4096,
+    "carousel": 4096,
+    "stories": 4096,
+}
 
 
 def _build_prompt(week_num: int, week_theme: str, common_rules: str, instruction: str) -> str:
@@ -83,9 +105,12 @@ def generate_pack(client: anthropic.Anthropic, week_num: int, week_theme: str, c
         prompt = _build_prompt(week_num, week_theme, common_rules, instruction)
         msg = client.messages.create(
             model="claude-sonnet-4-6",
-            max_tokens=4096,
+            max_tokens=MAX_TOKENS.get(key, 4096),
             messages=[{"role": "user", "content": prompt}],
         )
+        # 長文がトークン上限で途中終了した場合に気づけるようにする
+        if msg.stop_reason == "max_tokens":
+            print(f"    ⚠️ {title}: max_tokens に達して途中で切れた可能性があります")
         pack[key] = msg.content[0].text.strip()
     return pack
 
