@@ -25,6 +25,11 @@ def get_next_week_number(memo: str) -> int:
     return max(generated) + 1 if generated else 1
 
 
+def count_unpublished(memo: str) -> int:
+    """生成ログの表から公開状況が「未公開」の週数を数える(生成ゲート用)。"""
+    return len(re.findall(r'^\|\s*第\d+週.*\|\s*未公開\s*\|', memo, re.MULTILINE))
+
+
 def extract_week_section(theme_map: str, week_num: int) -> str:
     """12週テーママップから指定週のセクションを抽出する。"""
     pattern = rf'(## 第{week_num}週:.+?)(?=\n## 第\d+週:|\n---|\Z)'
@@ -41,7 +46,8 @@ def extract_common_rules(theme_map: str) -> str:
 # 生成する4つの成果物の定義(キー, タイトル, 個別指示)
 DELIVERABLES = [
     ("note", "note記事下書き",
-     "note記事下書きを作成してください。構成:タイトル案3本・リード文(400字以内)・本文構成(見出し付き)・CTA・"
+     "note記事下書きを作成してください。構成:タイトル案3本・リード文(400字以内)・本文(見出し付き。"
+     "骨子の箇条書きではなく、そのまま公開できる水準の通し読みできる自然な文章で書く)・CTA・"
      "参考情報源(確認先)・共通ルール適合チェックリスト。"
      "「参考情報源(確認先)」には、本文の制度・法令・数字の根拠として公開前に確認すべき一次情報の発行元"
      "(例:国土交通省、e-Gov法令検索、国税庁、試験実施機関)と確認ポイントを箇条書きで列挙してください。"
@@ -58,11 +64,14 @@ DELIVERABLES = [
 ]
 
 
-def _build_prompt(week_num: int, week_theme: str, common_rules: str, instruction: str) -> str:
+def _build_prompt(week_num: int, week_theme: str, common_rules: str, style_guide: str, instruction: str) -> str:
     return f"""あなたは石善建設(南房総の工務店・3代目 圭佑)の note×Instagram 連動コンテンツ担当です。
 
 ## 共通ルール(すべての生成物に適用)
 {common_rules}
+
+## 文章スタイルガイド(文体はこれに従う)
+{style_guide}
 
 ## 今週のテーマ(第{week_num}週)
 {week_theme}
@@ -70,6 +79,7 @@ def _build_prompt(week_num: int, week_theme: str, common_rules: str, instruction
 ## 生成指示
 インタビュー回答が未提供のため「素材待ちドラフト」として生成してください。
 圭佑の実体験を入れる箇所は「【ここに実体験:〇〇】」で明示してください。
+素材待ちドラフトでも、本文は骨子の箇条書きではなく通し読みできる自然な文章で書いてください(体験談パートは地の文)。
 補助金・法令・税制・許可制度に数値や要件を書く場合は「公開前に一次情報で確認」と注記してください。
 出典を示せない具体的な数値・金額基準・年数は断定せず、根拠の確認先(発行元)を示してください。制度は改正で古くなっている前提で扱ってください。
 固有名詞(取引先・チェーン名・契約詳細)は伏せ、一般論＋体験談の形にしてください。
@@ -80,7 +90,7 @@ def _build_prompt(week_num: int, week_theme: str, common_rules: str, instruction
 成果物の本文のみを Markdown で出力してください(前置き・後書き・コードフェンスは不要)。"""
 
 
-def generate_pack(client: anthropic.Anthropic, week_num: int, week_theme: str, common_rules: str) -> dict:
+def generate_pack(client: anthropic.Anthropic, week_num: int, week_theme: str, common_rules: str, style_guide: str) -> dict:
     """成果物ごとに個別の API 呼び出しを行い、セクション辞書で返す。
 
     1回にまとめるとトークン上限で末尾が切れるため、4回に分けて確実に生成する。
@@ -88,10 +98,10 @@ def generate_pack(client: anthropic.Anthropic, week_num: int, week_theme: str, c
     pack = {}
     for key, title, instruction in DELIVERABLES:
         print(f"  - {title} を生成中...")
-        prompt = _build_prompt(week_num, week_theme, common_rules, instruction)
+        prompt = _build_prompt(week_num, week_theme, common_rules, style_guide, instruction)
         msg = client.messages.create(
             model="claude-sonnet-4-6",
-            max_tokens=4096,
+            max_tokens=8192,
             messages=[{"role": "user", "content": prompt}],
         )
         pack[key] = msg.content[0].text.strip()
@@ -142,8 +152,16 @@ def main() -> None:
 
     today = date.today().isoformat()
 
-    theme_map  = (REPO_ROOT / "12週テーママップ.md").read_text(encoding="utf-8")
-    memo       = (REPO_ROOT / "進捗メモ.md").read_text(encoding="utf-8")
+    theme_map   = (REPO_ROOT / "12週テーママップ.md").read_text(encoding="utf-8")
+    memo        = (REPO_ROOT / "進捗メモ.md").read_text(encoding="utf-8")
+    style_guide = (REPO_ROOT / "文章スタイルガイド.md").read_text(encoding="utf-8")
+
+    unpublished = count_unpublished(memo)
+    if unpublished > 3:
+        print(f"⚠️ 未公開ドラフトが{unpublished}週分あります(基準:3週)。生成ゲートにより新規生成をスキップします。")
+        print("公開と未回答週のインタビュー回答を優先してください(自動運用ルーティーン.md 参照)。")
+        Path(".week_number").write_text("0")
+        return
 
     week_num = get_next_week_number(memo)
 
@@ -162,7 +180,7 @@ def main() -> None:
         sys.exit(1)
 
     client = anthropic.Anthropic(api_key=api_key)
-    pack   = generate_pack(client, week_num, week_theme, common_rules)
+    pack   = generate_pack(client, week_num, week_theme, common_rules, style_guide)
 
     write_files(week_num, pack, today)
     update_progress_memo(week_num, today)
