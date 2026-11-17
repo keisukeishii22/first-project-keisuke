@@ -5,8 +5,8 @@
 | タスク(現在の名前) | 貼り付けるファイル | 編集画面 | あわせて変える設定 |
 |---|---|---|---|
 | 記事作成(日曜) | `1_日曜_週次パック素材回収.md` | https://claude.ai/code/routines/trig_01294shuUHUWBBLK3AK3rSvo | コネクタは Google Drive と Gmail だけ残す(Canva・カレンダーは外す) |
-| note記事作成(月曜) | `2_月曜_note記事作成.md` | https://claude.ai/code/routines/trig_01PWjGndsxdyqGYqcXvhLn8m | 変更なし |
-| 石善建設ブログ 在庫番 | `3_月2回_ブログ在庫番.md` | https://claude.ai/code/routines/trig_015xKg8Hm2MpdzkYDvdPnSpj | モデルを最新の Sonnet に変更。コネクタは Google Drive と Gmail だけ残す |
+| note記事作成(月曜) | (停止) | https://claude.ai/code/routines/trig_01PWjGndsxdyqGYqcXvhLn8m | **2026-11-17 停止。** 編集画面でオフにする。理由は `2_月曜_note記事作成.md` の冒頭 |
+| 石善建設ブログ 在庫番 | `3_月2回_ブログ在庫番.md`(**2026-11-17 改訂:新規作成をやめ、リライト案2本**) | https://claude.ai/code/routines/trig_015xKg8Hm2MpdzkYDvdPnSpj | モデルを最新の Sonnet に変更。コネクタは Google Drive と Gmail だけ残す |
 | 日本株デイトレ 朝7時レポート | `4_平日朝_日本株レポート.md` | https://claude.ai/code/routines/trig_01JvBwPHMVgyQBucegVKKUXw | 下の注記を参照 |
 
 ## 日本株レポートの注記
